@@ -18,7 +18,7 @@ func TestEthProxyHandler(t *testing.T) {
 		{
 			name: "ok",
 			args: args{
-				r: httptest.NewRequest(http.MethodPost, "http://example.com/", nil),
+				r: httptest.NewRequest(http.MethodGet, "http://example.com/metadata/heroes/50010007", nil),
 			},
 		},
 	}
