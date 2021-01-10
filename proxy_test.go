@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,7 +19,9 @@ func TestEthProxyHandler(t *testing.T) {
 		{
 			name: "ok",
 			args: args{
-				r: httptest.NewRequest(http.MethodGet, "http://example.com/metadata/heroes/50010007", nil),
+				r: httptest.NewRequest(http.MethodPost, "http://example.com",
+					bytes.NewBufferString(`{"jsonrpc":"2.0","id":1,"method":"eth_getBalance","params":["0xd868711BD9a2C6F1548F5f4737f71DA67d821090","latest"]}`),
+				),
 			},
 		},
 	}
