@@ -2,52 +2,109 @@ package proxy
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
+
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/defaults"
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 )
 
-var (
-	httpEndpoint = os.Getenv("HTTP_ENDPOINT")
-)
+type Client struct {
+	Endpoint string
+	Logger   *log.Logger
+}
 
-func EthProxyHandler(w http.ResponseWriter, r *http.Request) {
-	err := Proxy(w, r)
+func NewClient(endpoint string, awsSignerV4 bool) *Client {
+	return &Client{
+		Endpoint: endpoint,
+		Logger:   log.New(os.Stdout, "", 0),
+	}
+}
+
+func (c *Client) Handler(w http.ResponseWriter, r *http.Request) {
+	_, err := c.Proxy(w, r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("...: %v", err), 500)
 	}
 }
 
-func Proxy(w http.ResponseWriter, r *http.Request) (err error) {
+type logCtx struct {
+	TimeStamp int64  `json:"ts"`
+	Method    string `json:"method"`
+	Status    int    `json:"status"`
+	Code      int64  `json:"code"`
+	Message   string `json:"message"`
+	Error     error  `json:"error"`
+}
+
+func (c *Client) log(lc *logCtx) {
+	b, _ := json.Marshal(lc)
+	c.Logger.Printf(string(b))
+}
+
+func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (status int, err error) {
+	lc := new(logCtx)
+	lc.TimeStamp = time.Now().Unix()
+	defer c.log(lc)
+
 	client := new(http.Client)
-	url := httpEndpoint + r.URL.Path
+	url := c.Endpoint + r.URL.Path
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, url, r.Body)
 	if err != nil {
+		lc.Error = err
 		return
 	}
-	body, err := ioutil.ReadAll(r.Body)
+	inBodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return err
+		lc.Error = err
+		return
 	}
-	req, err = Sign(req, body)
+	in := new(jsonRPCInput)
+	err = json.Unmarshal(inBodyBytes, in)
 	if err != nil {
-		return err
+		lc.Error = err
+		return
+	}
+	lc.Method = in.Method
+
+	req, err = Sign(req, inBodyBytes)
+	if err != nil {
+		lc.Error = err
+		return
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
+		lc.Error = err
 		return
 	}
 	defer resp.Body.Close()
+	lc.Status = resp.StatusCode
 
-	_, _ = io.Copy(w, resp.Body)
-	return nil
+	outBodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		lc.Error = err
+		return
+	}
+
+	out := new(jsonRPCOutput)
+	err = json.Unmarshal(outBodyBytes, out)
+	if err != nil {
+		lc.Error = err
+		return
+	}
+	lc.Code = out.Error.Code
+	lc.Message = out.Error.Message
+
+	_, err = w.Write(outBodyBytes)
+	lc.Error = err
+	return resp.StatusCode, err
 }
 
 func Sign(r *http.Request, body []byte) (*http.Request, error) {
@@ -56,4 +113,22 @@ func Sign(r *http.Request, body []byte) (*http.Request, error) {
 	signer := v4.NewSigner(creds)
 	_, err := signer.Sign(r, bytes.NewReader(body), "managedblockchain", *config.Region, time.Now())
 	return r, err
+}
+
+type jsonRPCInput struct {
+	Jsonrpc string          `json:"jsonrpc"`
+	ID      int64           `json:"id"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params"`
+}
+
+type jsonRPCOutput struct {
+	Jsonrpc string       `json:"jsonrpc"`
+	ID      int64        `json:"id"`
+	Error   jsonRPCError `json:"error"`
+}
+
+type jsonRPCError struct {
+	Code    int64  `json:"code"`
+	Message string `json:"message"`
 }

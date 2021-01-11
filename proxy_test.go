@@ -4,19 +4,23 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 )
 
 var getBalance = []byte(`{"jsonrpc":"2.0","id":1,"method":"eth_getBalance","params":["0xd868711BD9a2C6F1548F5f4737f71DA67d821090","latest"]}`)
 
-func TestEthProxyHandler(t *testing.T) {
+var c *Client
+
+func TestProxy(t *testing.T) {
 
 	type args struct {
 		r *http.Request
 	}
 	tests := []struct {
-		name string
-		args args
+		name    string
+		args    args
+		wantErr bool
 	}{
 		{
 			name: "ok",
@@ -28,7 +32,11 @@ func TestEthProxyHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := httptest.NewRecorder()
-			EthProxyHandler(got, tt.args.r)
+			err := c.Proxy(got, tt.args.r)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Proxy() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 			t.Log(got.Body.String())
 		})
 	}
@@ -46,7 +54,7 @@ func TestSign(t *testing.T) {
 	}{
 		{
 			name: "sign",
-			args: args{r: httptest.NewRequest(http.MethodPost, httpEndpoint, bytes.NewReader(getBalance)),
+			args: args{r: httptest.NewRequest(http.MethodPost, c.Endpoint, bytes.NewReader(getBalance)),
 				body: getBalance,
 			},
 			wantErr: false,
@@ -65,4 +73,10 @@ func TestSign(t *testing.T) {
 			// }
 		})
 	}
+}
+
+func TestMain(m *testing.M) {
+	c = NewClient(os.Getenv("HTTP_ENDPOINT"))
+	code := m.Run()
+	os.Exit(code)
 }
