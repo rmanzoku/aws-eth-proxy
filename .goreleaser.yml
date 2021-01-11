@@ -1,0 +1,23 @@
+project_name: awsethrpc
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - main: ./cmd/awsethrpc
+    binary: awsethrpc
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Revision={{.ShortCommit}}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+#      - darwin
+    goarch:
+      - amd64
+      - arm64
+release:
+  prerelease: auto
