@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -23,13 +22,11 @@ func EthProxyHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, fmt.Sprintf("...: %v", err), 500)
 	}
-
 }
 
 func Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 	client := new(http.Client)
 	url := httpEndpoint + r.URL.Path
-	log.Print(url)
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, url, r.Body)
 	if err != nil {
 		return
@@ -38,11 +35,10 @@ func Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		return err
 	}
-	_, err = GetSignature(req, bytes.NewReader(body))
+	req, err = Sign(req, body)
 	if err != nil {
 		return err
 	}
-	fmt.Println(req.Header)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -54,16 +50,10 @@ func Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 	return nil
 }
 
-func GetSignature(r *http.Request, body io.ReadSeeker) (http.Header, error) {
-	serviceName := "managedblockchain"
+func Sign(r *http.Request, body []byte) (*http.Request, error) {
 	config := defaults.Config()
 	creds := defaults.CredChain(config, defaults.Handlers())
 	signer := v4.NewSigner(creds)
-	_, err := signer.Sign(r, body, serviceName, *config.Region, time.Now())
-	if err != nil {
-		return nil, err
-	}
-	//	fmt.Println(r.Header)
-
-	return r.Header, nil
+	_, err := signer.Sign(r, bytes.NewReader(body), "managedblockchain", *config.Region, time.Now())
+	return r, err
 }
