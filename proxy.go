@@ -20,7 +20,7 @@ type Client struct {
 	Logger   *log.Logger
 }
 
-func NewClient(endpoint string, awsSignerV4 bool) *Client {
+func NewClient(endpoint string) *Client {
 	return &Client{
 		Endpoint: endpoint,
 		Logger:   log.New(os.Stdout, "", 0),
@@ -28,7 +28,7 @@ func NewClient(endpoint string, awsSignerV4 bool) *Client {
 }
 
 func (c *Client) Handler(w http.ResponseWriter, r *http.Request) {
-	_, err := c.Proxy(w, r)
+	err := c.Proxy(w, r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("...: %v", err), 500)
 	}
@@ -48,7 +48,7 @@ func (c *Client) log(lc *logCtx) {
 	c.Logger.Printf(string(b))
 }
 
-func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (status int, err error) {
+func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 	lc := new(logCtx)
 	lc.TimeStamp = time.Now().Unix()
 	defer c.log(lc)
@@ -104,7 +104,7 @@ func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (status int, err 
 
 	_, err = w.Write(outBodyBytes)
 	lc.Error = err
-	return resp.StatusCode, err
+	return err
 }
 
 func Sign(r *http.Request, body []byte) (*http.Request, error) {

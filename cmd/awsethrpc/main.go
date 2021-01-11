@@ -21,7 +21,7 @@ func init() {
 }
 
 func run() (err error) {
-	awsnode := proxy.NewClient(target, false)
+	awsnode := proxy.NewClient(target)
 	http.HandleFunc("/", awsnode.Handler)
 
 	return http.ListenAndServe(":"+port, nil)

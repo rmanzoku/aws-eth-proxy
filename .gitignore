@@ -1,5 +1,6 @@
 .envrc
 tmp/
+cmd/awsethrpc/awsethrpc
 
 # Binaries for programs and plugins
 *.exe
