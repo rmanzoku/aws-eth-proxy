@@ -15,6 +15,8 @@ import (
 	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 )
 
+var debug = false
+
 type Client struct {
 	Endpoint string
 	Logger   *log.Logger
@@ -36,6 +38,7 @@ func (c *Client) Handler(w http.ResponseWriter, r *http.Request) {
 
 type logCtx struct {
 	TimeStamp int64  `json:"ts"`
+	ID        int64  `json:"id"`
 	Method    string `json:"method"`
 	Status    int    `json:"status"`
 	Code      int64  `json:"code"`
@@ -65,6 +68,9 @@ func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 		lc.Error = err
 		return
 	}
+	if debug {
+		c.Logger.Println(string(inBodyBytes))
+	}
 	in := new(jsonRPCInput)
 	err = json.Unmarshal(inBodyBytes, in)
 	if err != nil {
@@ -72,6 +78,7 @@ func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 		return
 	}
 	lc.Method = in.Method
+	lc.ID = in.ID
 
 	req, err = Sign(req, inBodyBytes)
 	if err != nil {
@@ -91,6 +98,9 @@ func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 	if err != nil {
 		lc.Error = err
 		return
+	}
+	if debug {
+		c.Logger.Println(string(outBodyBytes))
 	}
 
 	out := new(jsonRPCOutput)
