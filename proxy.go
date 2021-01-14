@@ -57,7 +57,7 @@ func (c *Client) Proxy(w http.ResponseWriter, r *http.Request) (err error) {
 	defer c.log(lc)
 
 	client := new(http.Client)
-	url := c.Endpoint + r.URL.Path
+	url := c.Endpoint
 	req, err := http.NewRequestWithContext(r.Context(), r.Method, url, r.Body)
 	if err != nil {
 		lc.Error = err
